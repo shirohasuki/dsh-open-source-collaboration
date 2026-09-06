@@ -14,7 +14,7 @@ declare class Repos extends Service {
   private readonly root;
   private readonly role;
   private selectedRepo;
-  get repos(): readonly string[];
+  get watchlist(): readonly string[];
   get selected(): string | undefined;
   select(repo: string): string;
   constructor(ctx: Context, config: Config);

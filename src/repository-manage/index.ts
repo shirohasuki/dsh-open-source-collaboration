@@ -25,7 +25,7 @@ export default class Repos extends Service {
   private readonly role: Context['role']
   private selectedRepo: string | undefined
 
-  get repos(): readonly string[] {
+  get watchlist(): readonly string[] {
     return this.role.watchlist
   }
   get selected(): string | undefined {
@@ -42,40 +42,46 @@ export default class Repos extends Service {
     super(ctx, 'repos')
     this.role = ctx.role
 
-    ctx.tools.register(defineTool({
-      name: 'ensure_repo',
-      description: 'Clone a configured repository into workspace/<name> if missing. Returns the absolute path.',
-      parameters: {
-        name: {
-          type: 'string',
-          required: true,
-          description: 'Repository name from the configured list, e.g. "buckyball"',
+    ctx.tools.register(
+      defineTool({
+        name: 'ensure_repo',
+        description: 'Clone a configured repository into workspace/<name> if missing. Returns the absolute path.',
+        parameters: {
+          name: {
+            type: 'string',
+            required: true,
+            description: 'Repository name from the configured list, e.g. "buckyball"',
+          },
         },
-      },
-      output: {
-        schema: { type: 'string' },
-        render: (_args, value) => [{ type: 'text', text: value }],
-      },
-      execute: async (args) => this.ensure(args.name),
-    }))
+        output: {
+          schema: { type: 'string' },
+          render: (_args, value) => [{ type: 'text', text: value }],
+        },
+        execute: async args => this.ensure(args.name),
+      }),
+    )
 
-    ctx.tools.register(defineTool({
-      name: 'list_repos',
-      description: 'List configured workspace repositories and whether each has been ensured.',
-      parameters: {},
-      output: {
-        schema: { type: 'string' },
-        render: (_args, value) => [{ type: 'text', text: value }],
-      },
-      execute: async () => {
-        return this.role.watchlist.map((repo) => {
-          const name = repo.split('/')[1]
-          const dir = join(this.root, name)
-          const state = existsSync(join(dir, '.git')) ? 'ready' : 'missing'
-          return `${name}\t${state}\t${dir}`
-        }).join('\n')
-      },
-    }))
+    ctx.tools.register(
+      defineTool({
+        name: 'list_repos',
+        description: 'List configured workspace repositories and whether each has been ensured.',
+        parameters: {},
+        output: {
+          schema: { type: 'string' },
+          render: (_args, value) => [{ type: 'text', text: value }],
+        },
+        execute: async () => {
+          return this.role.watchlist
+            .map(repo => {
+              const name = repo.split('/')[1]
+              const dir = join(this.root, name)
+              const state = existsSync(join(dir, '.git')) ? 'ready' : 'missing'
+              return `${name}\t${state}\t${dir}`
+            })
+            .join('\n')
+        },
+      }),
+    )
   }
 
   private repoRef(name: string): string {
@@ -110,7 +116,9 @@ export default class Repos extends Service {
     }
     mkdirSync(this.root, { recursive: true })
     const [owner, repoName] = this.repoRef(name).split('/')
-    const result = spawnSync('git', ['clone', 'https://github.com/' + owner + '/' + repoName + '.git', dir], { stdio: 'inherit' })
+    const result = spawnSync('git', ['clone', 'https://github.com/' + owner + '/' + repoName + '.git', dir], {
+      stdio: 'inherit',
+    })
     if (result.status !== 0) throw new Error(`git clone failed for ${name}`)
     return dir
   }
