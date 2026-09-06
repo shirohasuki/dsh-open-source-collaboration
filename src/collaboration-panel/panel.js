@@ -34,7 +34,7 @@ async function runLogin(onNotice) {
   throw new Error('role: login stream ended')
 }
 
-function Panel({ onClose }) {
+function Panel() {
   const [items, setItems] = useState(null)
   const [repos, setRepos] = useState(null)
   const [repoInput, setRepoInput] = useState('')
@@ -118,14 +118,12 @@ function Panel({ onClose }) {
     subtitle = items ? repoLabel + ' · ' + items.length + ' 条待办' : repoLabel + ' · 刷新看板中'
   }
 
-  return h('div', { className: 'dsh-collaboration-panel-backdrop', onPointerDown: (event) => { if (event.currentTarget === event.target) onClose() } },
-    h('section', { id: PANEL_ID, className: 'dsh-collaboration-panel', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'dsh-collaboration-panel-title' },
+  return h('div', { className: 'dsh-collaboration-panel' },
       h('header', { className: 'dsh-collaboration-panel-header' },
         h('span', { className: 'dsh-collaboration-panel-brand' }, h(IconList)),
-        h('div', { className: 'dsh-collaboration-panel-heading' }, h('h2', { className: 'dsh-collaboration-panel-title', id: 'dsh-collaboration-panel-title' }, '协作面板'), h('div', { className: 'dsh-collaboration-panel-subtitle' }, subtitle)),
+        h('div', { className: 'dsh-collaboration-panel-heading' }, h('h2', { className: 'dsh-collaboration-panel-title', id: 'dsh-collaboration-panel-title' }, '协作'), h('div', { className: 'dsh-collaboration-panel-subtitle' }, subtitle)),
         h('div', { className: 'dsh-collaboration-panel-actions' },
-          h('button', { type: 'button', className: 'dsh-collaboration-panel-icon-btn', title: '刷新', 'aria-label': '刷新', onClick: () => void refresh() }, h(IconRefresh)),
-          h('button', { type: 'button', className: 'dsh-collaboration-panel-icon-btn', title: '关闭', 'aria-label': '关闭', onClick: onClose }, h(IconClose)))),
+          h('button', { type: 'button', className: 'dsh-collaboration-panel-icon-btn', title: '刷新', 'aria-label': '刷新', onClick: () => void refresh() }, h(IconRefresh))),
       h('div', { className: 'dsh-collaboration-panel-body' },
         h('section', { className: 'dsh-collaboration-panel-repos' },
           h('div', { className: 'dsh-collaboration-panel-section-head' }, h('div', null, h('div', { className: 'dsh-collaboration-panel-kicker' }, 'WATCHLIST'), h('h3', null, '仓库')), h('span', { className: 'dsh-collaboration-panel-count' }, repos ? String(repos.length) : '…')),
@@ -141,5 +139,5 @@ function Panel({ onClose }) {
             ? h('div', { className: 'dsh-collaboration-panel-empty' }, h('p', { className: 'dsh-collaboration-panel-empty-title' }, '还没有待办'), h('p', { className: 'dsh-collaboration-panel-empty-desc' }, '当前仓库里没有指派给你的 issue，也没有等你 review 的 PR。'))
             : h('div', { className: 'dsh-collaboration-panel-list' }, items.map((item) => h('button', { key: `${item.repo}#${item.number}`, type: 'button', className: `dsh-collaboration-panel-row${sel === `${item.repo}#${item.number}` ? ' on' : ''}`, onClick: () => void openRow(item) }, h('span', { className: 'dsh-collaboration-panel-kind', 'data-kind': item.kind }, item.kind), h('div', { className: 'dsh-collaboration-panel-row-main' }, h('div', { className: 'dsh-collaboration-panel-row-title' }, item.title), h('div', { className: 'dsh-collaboration-panel-meta' }, `${item.repo}#${item.number} · ${item.author} · ${fmtTime(item.updatedAt)}`)))))),
         detail && h('div', { className: 'dsh-collaboration-panel-detail' }, h('div', { className: 'dsh-collaboration-panel-detail-head' }, h('h3', { className: 'dsh-collaboration-panel-detail-title' }, detail.title), h('span', { className: 'dsh-collaboration-panel-state' }, detail.state)), h('div', { className: 'dsh-collaboration-panel-fields' }, h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'red', 'aria-hidden': true }), h('span', { className: 'dsh-collaboration-panel-field-text' }, `labels: ${detail.labels.join(', ') || '—'}`)), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'yellow', 'aria-hidden': true }), h('span', { className: 'dsh-collaboration-panel-field-text' }, `assignees: ${detail.assignees.join(', ') || '—'}`)), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'green', 'aria-hidden': true }), h('span', { className: 'dsh-collaboration-panel-field-text' }, `reviewers: ${detail.requestedReviewers.join(', ') || '—'}`))), h('pre', { className: 'dsh-collaboration-panel-detail-body' }, detail.body || '(no body)'), h('a', { href: detail.url, target: '_blank', rel: 'noreferrer' }, '在 GitHub 打开'))),
-      h('footer', { className: 'dsh-collaboration-panel-footer' }, '点选一行查看详情 · 完整讨论请到 GitHub')))
+      h('footer', { className: 'dsh-collaboration-panel-footer' }, '点选一行查看详情 · 底部聊天栏可继续对话')))
 }
