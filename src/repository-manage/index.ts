@@ -6,13 +6,10 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
 
-/** harness repo root: packages/open-source-collaboration/lib -> ../../.. */
-const HARNESS_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+/** harness repo root: packages/open-source-collaboration/lib -> ../../../.. */
+const HARNESS_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
-export interface Config {
-  /** name -> git clone URL */
-  repos: Record<string, string>
-}
+export interface Config {}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -21,57 +18,82 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export default class Repos extends Service {
-  static inject = ['tools']
-  static Config: z<Config> = z.object({
-    repos: z.dict(z.string()),
-  })
+  static inject = ['tools', 'role']
+  static Config: z<Config> = z.object({})
 
   private readonly root = join(HARNESS_ROOT, 'workspace')
-  private readonly urls: Record<string, string>
+  private readonly role: Context['role']
+  private selectedRepo: string | undefined
+
+  get watchlist(): readonly string[] {
+    return this.role.watchlist
+  }
+  get selected(): string | undefined {
+    return this.selectedRepo
+  }
+
+  select(repo: string): string {
+    if (!this.role.watchlist.includes(repo)) throw new Error('unknown repo: ' + repo)
+    this.selectedRepo = repo
+    return repo
+  }
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'repos')
-    this.urls = config.repos
+    this.role = ctx.role
 
-    ctx.tools.register(defineTool({
-      name: 'ensure_repo',
-      description: 'Clone a configured repository into workspace/<name> if missing. Returns the absolute path.',
-      parameters: {
-        name: {
-          type: 'string',
-          required: true,
-          description: 'Repository name from the configured list, e.g. "buckyball"',
+    ctx.tools.register(
+      defineTool({
+        name: 'ensure_repo',
+        description: 'Clone a configured repository into workspace/<name> if missing. Returns the absolute path.',
+        parameters: {
+          name: {
+            type: 'string',
+            required: true,
+            description: 'Repository name from the configured list, e.g. "buckyball"',
+          },
         },
-      },
-      output: {
-        schema: { type: 'string' },
-        render: (_args, value) => [{ type: 'text', text: value }],
-      },
-      execute: async (args) => this.ensure(args.name),
-    }))
+        output: {
+          schema: { type: 'string' },
+          render: (_args, value) => [{ type: 'text', text: value }],
+        },
+        execute: async args => this.ensure(args.name),
+      }),
+    )
 
-    ctx.tools.register(defineTool({
-      name: 'list_repos',
-      description: 'List configured workspace repositories and whether each has been ensured.',
-      parameters: {},
-      output: {
-        schema: { type: 'string' },
-        render: (_args, value) => [{ type: 'text', text: value }],
-      },
-      execute: async () => {
-        return Object.keys(this.urls).map((name) => {
-          const dir = join(this.root, name)
-          const state = existsSync(join(dir, '.git')) ? 'ready' : 'missing'
-          return `${name}\t${state}\t${dir}`
-        }).join('\n')
-      },
-    }))
+    ctx.tools.register(
+      defineTool({
+        name: 'list_repos',
+        description: 'List configured workspace repositories and whether each has been ensured.',
+        parameters: {},
+        output: {
+          schema: { type: 'string' },
+          render: (_args, value) => [{ type: 'text', text: value }],
+        },
+        execute: async () => {
+          return this.role.watchlist
+            .map(repo => {
+              const name = repo.split('/')[1]
+              const dir = join(this.root, name)
+              const state = existsSync(join(dir, '.git')) ? 'ready' : 'missing'
+              return `${name}\t${state}\t${dir}`
+            })
+            .join('\n')
+        },
+      }),
+    )
+  }
+
+  private repoRef(name: string): string {
+    const repo = this.role.watchlist.find(repo => repo.split('/')[1] === name)
+    if (repo === undefined) throw new Error('unknown repo: ' + name)
+    return repo
   }
 
   /** Expected path for a configured repo name. */
   path(name: string): string {
-    if (!(name in this.urls)) throw new Error(`unknown repo: ${name}`)
-    return join(this.root, name)
+    const repoName = this.repoRef(name).split('/')[1]
+    return join(this.root, repoName)
   }
 
   /** Absolute path of an ensured repo; throws if not cloned yet. */
@@ -93,7 +115,10 @@ export default class Repos extends Service {
       return dir
     }
     mkdirSync(this.root, { recursive: true })
-    const result = spawnSync('git', ['clone', this.urls[name], dir], { stdio: 'inherit' })
+    const [owner, repoName] = this.repoRef(name).split('/')
+    const result = spawnSync('git', ['clone', 'https://github.com/' + owner + '/' + repoName + '.git', dir], {
+      stdio: 'inherit',
+    })
     if (result.status !== 0) throw new Error(`git clone failed for ${name}`)
     return dir
   }

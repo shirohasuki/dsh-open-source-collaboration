@@ -6,7 +6,6 @@ import { AuthorizationInteraction } from "@deepseek-ai/dsh-authorization";
 //#region src/role/config.d.ts
 interface Config {
   clientId: string;
-  repos: string[];
   scopes: string;
   apiBaseUrl: string;
   oauthBaseUrl: string;
@@ -29,8 +28,12 @@ declare class Role extends Service {
   static inject: string[];
   static Config: z<Config>;
   readonly config: Config;
-  get repos(): readonly string[];
+  private readonly reposPath;
+  get watchlist(): readonly string[];
   constructor(ctx: Context, config: Config);
+  private loadRepos;
+  private saveRepos;
+  private handleRepos;
   private handleLogin;
   login(interaction: AuthorizationInteraction, signal?: AbortSignal): Promise<{
     login: string;
