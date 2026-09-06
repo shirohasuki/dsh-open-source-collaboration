@@ -7,6 +7,7 @@ import { isMaintainer, parsePermission } from './permissions.ts'
 export interface RoleHost {
   readonly ctx: Context
   readonly config: Config
+  readonly watchlist: readonly string[]
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -35,7 +36,7 @@ export async function whoami(role: RoleHost): Promise<{ login: string; maintaine
   const user = await githubJson(role, '/user') as { login?: unknown }
   if (typeof user.login !== 'string' || user.login.length === 0) throw new Error('role: /user missing login')
   const maintainers: Record<string, boolean> = {}
-  for (const repo of role.config.repos) {
+  for (const repo of role.watchlist) {
     const [owner, name] = repo.split('/')
     const body = await githubJson(role, `/repos/${owner}/${name}/collaborators/${user.login}/permission`)
     maintainers[repo] = isMaintainer(parsePermission(body))

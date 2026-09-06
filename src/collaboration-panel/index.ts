@@ -69,7 +69,7 @@ export function mapDetail(raw: any, repo: string, kind: Kind): BoardDetail {
 async function listItems(ctx: Context): Promise<BoardItem[]> {
   const { login } = await ctx.role.whoami()
   const items: BoardItem[] = []
-  for (const repo of ctx.role.repos) {
+  for (const repo of ctx.role.watchlist) {
     for (const [kind, q] of [
       ['issue', issueSearchQuery(repo, login)],
       ['pr', prSearchQuery(repo, login)],
@@ -85,7 +85,7 @@ async function listItems(ctx: Context): Promise<BoardItem[]> {
 }
 
 async function getDetail(ctx: Context, repo: string, number: number): Promise<BoardDetail> {
-  if (!ctx.role.repos.includes(repo)) throw new Error(`collaboration-panel: unknown repo ${repo}`)
+  if (!ctx.role.watchlist.includes(repo)) throw new Error(`collaboration-panel: unknown repo ${repo}`)
   const [owner, name_] = repo.split('/')
   const issue: any = await ctx.role.githubJson(`/repos/${owner}/${name_}/issues/${number}`)
   if (issue.pull_request) {
