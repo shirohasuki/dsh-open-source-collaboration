@@ -1,8 +1,5 @@
-function Entry({ wide }) {
-  const [open, setOpen] = useState(false)
-  return h(React.Fragment, null,
-    h('button', { type: 'button', className: `dsh-collaboration-panel-trigger${wide ? '' : ' rail'}`, title: '协作面板', 'aria-label': '协作面板', 'aria-expanded': open, 'aria-controls': PANEL_ID, onClick: () => setOpen((value) => !value) }, h(IconList), wide && h('span', null, '协作面板')),
-    open && h(Panel, { onClose: () => setOpen(false) }))
+function CollabView() {
+  return h('div', { id: PANEL_ID, className: 'dsh-collaboration-view' }, h(Panel))
 }
 
 function apply(ctx) {
@@ -13,5 +10,8 @@ function apply(ctx) {
     document.head.appendChild(style)
     return () => style.remove()
   }, 'collaboration-panel: styles')
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'collaboration-panel', order: 0 }, Entry))
+  ctx.slots.inject('conversation.view', () => ctx.slots.register(
+    { name: 'conversation.view', id: 'collaboration', order: 15, label: '协作' },
+    CollabView,
+  ))
 }
