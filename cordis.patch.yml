@@ -1,0 +1,20 @@
+- insert:
+    - id: open-source-collaboration
+      name: '@dangosys/dsh-open-source-collaboration'
+    - id: authorization
+      name: '@deepseek-ai/dsh-authorization'
+    - id: role
+      name: '@dangosys/dsh-open-source-collaboration/role'
+      config:
+        clientId: Ov23lixMRqTArZkZ92EI
+        repos:
+          - DangoSys/buckyball
+          - DangoSys/harness
+        scopes: read:user repo
+    - id: repository-manage
+      name: '@dangosys/dsh-open-source-collaboration/repository-manage'
+      config:
+        repos:
+          buckyball: https://github.com/DangoSys/buckyball.git
+    - id: collaboration-panel
+      name: '@dangosys/dsh-open-source-collaboration/collaboration-panel'
