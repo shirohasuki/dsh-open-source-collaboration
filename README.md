@@ -1,1 +1,1 @@
-# open-source-collaboration
+# dsh-open-source-collaboration (dsh-OSC)
