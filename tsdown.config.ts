@@ -6,6 +6,7 @@ export default defineConfig({
     'src/role/index.ts',
     'src/collaboration-panel/index.ts',
     'src/repository-manage/index.ts',
+    'src/github-bot/index.ts',
   ],
   outDir: 'lib',
   format: ['esm'],
