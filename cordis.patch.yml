@@ -12,3 +12,11 @@
       name: '@dangosys/dsh-open-source-collaboration/repository-manage'
     - id: collaboration-panel
       name: '@dangosys/dsh-open-source-collaboration/collaboration-panel'
+    - id: github-bot
+      name: '@dangosys/dsh-open-source-collaboration/github-bot'
+      config:
+        orgs:
+          DangoSys:
+            appId: 2997069
+            installationId: 113732214
+            privateKeyFile: ''  # operator fills absolute path to ChipCrowd App PEM

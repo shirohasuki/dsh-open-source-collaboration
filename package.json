@@ -15,6 +15,7 @@
     "./role": "./lib/role/index.js",
     "./collaboration-panel": "./lib/collaboration-panel/index.js",
     "./repository-manage": "./lib/repository-manage/index.js",
+    "./github-bot": "./lib/github-bot/index.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
