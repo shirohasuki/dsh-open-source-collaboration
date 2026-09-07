@@ -96,45 +96,46 @@ export default class GitHubBot extends Service {
 
   async commitAndOpenPullRequest(input: CommitPullRequestInput): Promise<PullRequestResult> {
     const [owner, repo] = input.repo.split('/')
-    const baseRef = await this.request(input.org, `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(input.base)}`) as { object: { sha: string } }
+    const orgConfig: OrgConfig | undefined = this.config.orgs[input.org]
+    if (!orgConfig) throw new Error(`github-bot: unknown org ${input.org}`)
+    const { token } = await createInstallationToken(orgConfig)
+    const request = (path: string, init?: RequestInit) => this.request(orgConfig, token, path, init)
+    const baseRef = await request(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(input.base)}`) as { object: { sha: string } }
     const parentSha = baseRef.object.sha
-    const parent = await this.request(input.org, `/repos/${owner}/${repo}/git/commits/${parentSha}`) as { tree: { sha: string } }
+    const parent = await request(`/repos/${owner}/${repo}/git/commits/${parentSha}`) as { tree: { sha: string } }
     const blobs = await Promise.all(input.changes.map(async change => {
-      const blob = await this.request(input.org, `/repos/${owner}/${repo}/git/blobs`, {
+      const blob = await request(`/repos/${owner}/${repo}/git/blobs`, {
         method: 'POST',
         body: JSON.stringify({ content: change.content, encoding: 'utf-8' }),
       }) as { sha: string }
       return { path: change.path, mode: '100644', type: 'blob', sha: blob.sha }
     }))
-    const tree = await this.request(input.org, `/repos/${owner}/${repo}/git/trees`, {
+    const tree = await request(`/repos/${owner}/${repo}/git/trees`, {
       method: 'POST',
       body: JSON.stringify({ base_tree: parent.tree.sha, tree: blobs }),
     }) as { sha: string }
-    const commit = await this.request(input.org, `/repos/${owner}/${repo}/git/commits`, {
+    const commit = await request(`/repos/${owner}/${repo}/git/commits`, {
       method: 'POST',
       body: JSON.stringify({ message: input.message, tree: tree.sha, parents: [parentSha] }),
     }) as { sha: string }
-    await this.request(input.org, `/repos/${owner}/${repo}/git/refs`, {
+    await request(`/repos/${owner}/${repo}/git/refs`, {
       method: 'POST',
       body: JSON.stringify({ ref: `refs/heads/${input.branch}`, sha: commit.sha }),
     })
-    const pull = await this.request(input.org, `/repos/${owner}/${repo}/pulls`, {
+    const pull = await request(`/repos/${owner}/${repo}/pulls`, {
       method: 'POST',
       body: JSON.stringify({ title: input.title, body: input.body, head: input.branch, base: input.base }),
     }) as { number: number; html_url: string }
     return { number: pull.number, url: pull.html_url, commitSha: commit.sha, branch: input.branch, base: input.base }
   }
 
-  private async request(org: string, path: string, init?: RequestInit): Promise<unknown> {
-    const orgConfig: OrgConfig | undefined = this.config.orgs[org]
-    if (!orgConfig) throw new Error(`github-bot: unknown org ${org}`)
-    const { token } = await createInstallationToken(orgConfig)
+  private async request(config: OrgConfig, token: string, path: string, init?: RequestInit): Promise<unknown> {
     const headers = new Headers(init?.headers)
     headers.set('accept', 'application/vnd.github+json')
     headers.set('authorization', `Bearer ${token}`)
     headers.set('content-type', 'application/json')
     headers.set('x-github-api-version', '2022-11-28')
-    const response = await fetch(`${orgConfig.apiBaseUrl ?? 'https://api.github.com'}${path}`, { ...init, headers })
+    const response = await fetch(`${config.apiBaseUrl ?? 'https://api.github.com'}${path}`, { ...init, headers })
     const text = await response.text()
     if (!response.ok) throw new Error(`github-bot: GitHub API ${response.status}: ${text}`)
     return text.length === 0 ? null : JSON.parse(text)
