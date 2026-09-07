@@ -105,6 +105,15 @@ export default class GitHubBot extends Service {
     if (!orgConfig) throw new Error(`github-bot: unknown org ${input.org}`)
     const { token } = await createInstallationToken(orgConfig)
     const request = (path: string, init?: RequestInit) => this.request(orgConfig, token, path, init)
+    const branchPath = `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(input.branch)}`
+    try {
+      const branchRef = await request(branchPath) as { object: { sha: string } }
+      throw new Error(
+        `github-bot: branch ${input.branch} already exists at ${branchRef.object.sha}; use a unique branch name`,
+      )
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.startsWith('github-bot: GitHub API 404:')) throw error
+    }
     const baseRef = await request(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(input.base)}`) as { object: { sha: string } }
     const parentSha = baseRef.object.sha
     const parent = await request(`/repos/${owner}/${repo}/git/commits/${parentSha}`) as { tree: { sha: string } }
