@@ -4,6 +4,7 @@ import z from '@deepseek-ai/schemastery'
 import { Config } from './config.ts'
 import { createInstallationToken } from './token.ts'
 import type { OrgConfig } from './config.ts'
+import { isRepoRef } from '../repo-ref.ts'
 
 export type { Config, OrgConfig } from './config.ts'
 
@@ -95,12 +96,11 @@ export default class GitHubBot extends Service {
   }
 
   async commitAndOpenPullRequest(input: CommitPullRequestInput): Promise<PullRequestResult> {
-    const repoParts = input.repo?.split('/')
-    if (!repoParts || repoParts.length !== 2 || repoParts.some(part => !part || part === '.' || part === '..')) {
+    if (!isRepoRef(input.repo)) {
       throw new Error('github-bot: repo must be in owner/name form')
     }
     if (!input.changes?.length) throw new Error('github-bot: changes must not be empty')
-    const [owner, repo] = repoParts
+    const [owner, repo] = input.repo.split('/')
     const orgConfig: OrgConfig | undefined = this.config.orgs[input.org]
     if (!orgConfig) throw new Error(`github-bot: unknown org ${input.org}`)
     const { token } = await createInstallationToken(orgConfig)
