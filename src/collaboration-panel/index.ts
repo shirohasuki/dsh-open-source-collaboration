@@ -33,6 +33,11 @@ export function prSearchQuery(repo: string, login: string): string {
   return `repo:${repo} is:pr is:open review-requested:${login}`
 }
 
+function isGitHubAuthError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('not logged in') || message.startsWith('GitHub 401:')
+}
+
 export function mapSearchItem(raw: any, kind: Kind): BoardItem {
   const m = String(raw.repository_url).match(/\/repos\/([^/]+\/[^/]+)$/)
   if (!m) throw new Error(`collaboration-panel: bad repository_url ${raw.repository_url}`)
@@ -121,7 +126,7 @@ export function apply(ctx: Context) {
         write(res, 200, 'application/json; charset=utf-8', JSON.stringify(await getDetail(ctx, repo, number)))
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        write(res, message.includes('not logged in') ? 401 : 500, 'text/plain; charset=utf-8', message)
+        write(res, isGitHubAuthError(err) ? 401 : 500, 'text/plain; charset=utf-8', message)
       }
     },
   }), 'collaboration-panel: api')
