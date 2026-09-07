@@ -7,7 +7,7 @@ import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { AuthorizationInteraction } from '@deepseek-ai/dsh-authorization'
 import { KEY } from './constants.ts'
-import { githubJson, login, runDeviceFlow, whoami, type WhoamiResult } from './github.ts'
+import { githubCloneUrl, githubJson, login, runDeviceFlow, whoami, type WhoamiResult } from './github.ts'
 import type { Config } from './config.ts'
 import { isRepoRef } from '../repo-ref.ts'
 export { KEY } from './constants.ts'
@@ -166,5 +166,9 @@ export default class Role extends Service {
 
   async githubJson(path: string, init?: RequestInit): Promise<unknown> {
     return githubJson({ ctx: this.ctx, config: this.config, watchlist: this.watchlist }, path, init)
+  }
+
+  async githubCloneUrl(repo: string): Promise<string> {
+    return githubCloneUrl({ ctx: this.ctx, config: this.config, watchlist: this.watchlist }, repo)
   }
 }

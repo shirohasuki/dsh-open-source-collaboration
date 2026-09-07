@@ -44,6 +44,7 @@ declare class Role extends Service {
     errors: Record<string, { status: number; message: string }>;
   }>;
   githubJson(path: string, init?: RequestInit): Promise<unknown>;
+  githubCloneUrl(repo: string): Promise<string>;
 }
 //#endregion
 export { type Config, KEY, Role as default, isMaintainer, parsePermission };

@@ -105,7 +105,7 @@ export default class Repos extends Service {
   }
 
   /** Clone into workspace/<owner>/<repo> when absent; reuse existing git checkout. */
-  ensure(name: string): string {
+  async ensure(name: string): Promise<string> {
     const dir = this.path(name)
     if (existsSync(dir)) {
       if (!existsSync(join(dir, '.git'))) {
@@ -114,8 +114,8 @@ export default class Repos extends Service {
       return dir
     }
     mkdirSync(dirname(dir), { recursive: true })
-    const [owner, repoName] = this.repoRef(name).split('/')
-    const result = spawnSync('git', ['clone', 'https://github.com/' + owner + '/' + repoName + '.git', dir], {
+    const cloneUrl = await this.role.githubCloneUrl(this.repoRef(name))
+    const result = spawnSync('git', ['clone', cloneUrl, dir], {
       stdio: 'inherit',
     })
     if (result.status !== 0) throw new Error(`git clone failed for ${name}`)

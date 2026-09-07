@@ -67,6 +67,33 @@ export async function whoami(role: RoleHost): Promise<WhoamiResult> {
 }
 
 export async function githubJson(role: RoleHost, path: string, init?: RequestInit): Promise<unknown> {
+  const accessToken = await githubAccessToken(role)
+  const url = `${role.config.apiBaseUrl.replace(/\/+$/, '')}${path}`
+  const headers = new Headers(init?.headers)
+  headers.set('Accept', 'application/vnd.github+json')
+  headers.set('Authorization', `Bearer ${accessToken}`)
+  headers.set('X-GitHub-Api-Version', '2022-11-28')
+  headers.set('User-Agent', 'dsh-role')
+  const response = await fetch(url, { ...init, headers })
+  const text = await response.text()
+  if (!response.ok) throw new GitHubHttpError(response.status, text)
+  return text.length === 0 ? null : JSON.parse(text)
+}
+
+export async function githubCloneUrl(role: RoleHost, repo: string): Promise<string> {
+  const accessToken = await githubAccessToken(role)
+  const configuredApi = new URL(role.config.apiBaseUrl)
+  const configuredOauth = new URL(role.config.oauthBaseUrl)
+  const host = configuredOauth.hostname === 'github.com' && configuredApi.hostname !== 'api.github.com'
+    ? configuredApi.origin
+    : configuredOauth.origin
+  const url = new URL(`${host}/${repo}.git`)
+  url.username = 'x-access-token'
+  url.password = accessToken
+  return url.toString()
+}
+
+async function githubAccessToken(role: RoleHost): Promise<string> {
   const record = await role.ctx.credentials.readRecord(KEY)
   if (record === undefined) throw new Error('not logged in')
   if (record.kind !== 'grant') throw new Error('role: credential is not a grant')
@@ -74,16 +101,7 @@ export async function githubJson(role: RoleHost, path: string, init?: RequestIni
   if (typeof payload?.accessToken !== 'string' || payload.accessToken.length === 0) {
     throw new Error('role: grant missing accessToken')
   }
-  const url = `${role.config.apiBaseUrl.replace(/\/+$/, '')}${path}`
-  const headers = new Headers(init?.headers)
-  headers.set('Accept', 'application/vnd.github+json')
-  headers.set('Authorization', `Bearer ${payload.accessToken}`)
-  headers.set('X-GitHub-Api-Version', '2022-11-28')
-  headers.set('User-Agent', 'dsh-role')
-  const response = await fetch(url, { ...init, headers })
-  const text = await response.text()
-  if (!response.ok) throw new GitHubHttpError(response.status, text)
-  return text.length === 0 ? null : JSON.parse(text)
+  return payload.accessToken
 }
 
 export async function runDeviceFlow(role: RoleHost, session: AuthorizationSession): Promise<void> {
