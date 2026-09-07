@@ -59,7 +59,7 @@ export async function whoami(role: RoleHost): Promise<WhoamiResult> {
       const body = await githubJson(role, `/repos/${owner}/${name}/collaborators/${user.login}/permission`)
       maintainers[repo] = isMaintainer(parsePermission(body))
     } catch (error) {
-      if (!(error instanceof GitHubHttpError)) throw error
+      if (!(error instanceof GitHubHttpError) || (error.status !== 403 && error.status !== 404)) throw error
       errors[repo] = { status: error.status, message: error.message }
     }
   }

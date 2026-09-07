@@ -9,12 +9,14 @@ function itemLabel(item) {
 }
 
 function ActivityPane({ items, full, onOpen }) {
-  const activity = items ? items.slice(0, 6) : []
+  const errors = items ? items.filter(item => item.kind === 'error') : []
+  const activity = items ? items.filter(item => item.kind !== 'error').slice(0, 6) : []
+  const visible = errors.concat(activity)
   return h('aside', { className: `dsh-collaboration-panel-activity${full ? ' dsh-collaboration-panel-activity-only' : ''}` },
     h('div', { className: 'dsh-collaboration-panel-activity-head' }, 'ACTIVITY'),
     h('div', { className: 'dsh-collaboration-panel-activity-list' },
-      activity.length > 0
-        ? activity.map((item) => item.kind === 'error'
+      visible.length > 0
+        ? visible.map((item) => item.kind === 'error'
           ? h('div', { key: item.repo, className: 'dsh-collaboration-panel-activity-row' },
               h('span', { className: 'dsh-collaboration-panel-activity-dot warning', 'aria-hidden': true }),
               h('span', { className: 'dsh-collaboration-panel-activity-copy' }, 'Repository unavailable', h('em', null, item.repo + ': ' + item.message)),
@@ -59,10 +61,10 @@ function BoardView({ items, selected, onOpen }) {
 function TableView({ items, selected, onOpen }) {
   return h('table', { className: 'dsh-collaboration-panel-table' },
     h('thead', null, h('tr', null, h('th', null, 'TYPE'), h('th', null, 'ITEM'), h('th', null, 'UPDATED'))),
-    h('tbody', null, items.filter(item => item.kind !== 'error').map(item => h('tr', { key: `${item.repo}#${item.number}`, className: selected === `${item.repo}#${item.number}` ? 'on' : '', onClick: () => onOpen(item) },
+    h('tbody', null, items.map(item => h('tr', { key: `${item.repo}#${item.number}`, className: selected === `${item.repo}#${item.number}` ? 'on' : '', onClick: item.kind === 'error' ? undefined : () => onOpen(item) },
       h('td', null, h('span', { className: 'dsh-collaboration-panel-table-kind' }, item.kind)),
-      h('td', null, h('div', { className: 'dsh-collaboration-panel-table-title' }, item.title), h('div', null, `${item.repo}#${item.number} · ${item.author}`)),
-      h('td', null, fmtTime(item.updatedAt)),
+      h('td', null, h('div', { className: 'dsh-collaboration-panel-table-title' }, item.kind === 'error' ? 'Repository unavailable' : item.title), h('div', null, item.kind === 'error' ? `${item.repo}: ${item.message}` : `${item.repo}#${item.number} · ${item.author}`)),
+      h('td', null, item.kind === 'error' ? '—' : fmtTime(item.updatedAt)),
     ))),
   )
 }
