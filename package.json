@@ -5,7 +5,7 @@
   "publishConfig": {"access": "public"},
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shirohasuki/open-source-collaboration.git"
+    "url": "git+https://github.com/shirohasuki/dsh-open-source-collaboration.git"
   },
   "type": "module",
   "main": "lib/index.js",
