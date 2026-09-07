@@ -91,6 +91,11 @@ async function runLogin(onNotice) {
   }
   throw new Error('role: login stream ended')
 }
+function requireRepos(repos) {
+  if (!repos) throw new Error('collaboration-panel: repositories missing')
+  return repos
+}
+
 function Panel() {
   const [items, setItems] = useState(null)
   const [repos, setRepos] = useState(null)
@@ -111,6 +116,7 @@ function Panel() {
     const text = await response.text()
     if (!response.ok) throw new Error(text)
     const liveRepos = JSON.parse(text)
+    if (!Array.isArray(liveRepos)) throw new Error('collaboration-panel: repositories missing')
     setRepos(liveRepos)
     return liveRepos
   }
@@ -157,7 +163,7 @@ function Panel() {
       const response = await fetch(REPOS, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: repoInput.trim() }) })
       const text = await response.text()
       if (!response.ok) throw new Error(text)
-      setRepoInput(''); setRepos(JSON.parse(text)); setManageWatchlist(false); void refresh()
+      setRepoInput(''); setRepos(requireRepos(JSON.parse(text))); setManageWatchlist(false); void refresh()
     } catch (err) { setError(err instanceof Error ? err.message : String(err)) }
     finally { setRepoBusy(false) }
   }
@@ -168,7 +174,7 @@ function Panel() {
       const response = await fetch(REPOS, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo }) })
       const text = await response.text()
       if (!response.ok) throw new Error(text)
-      const nextRepos = JSON.parse(text)
+      const nextRepos = requireRepos(JSON.parse(text))
       setRepos(nextRepos)
       if (filterRepo === repo) setFilterRepo(null)
       void refresh()
@@ -177,8 +183,8 @@ function Panel() {
   }
 
   const visibleItems = items ? items.filter(item => !filterRepo || item.repo === filterRepo) : []
-  const toolbarRepos = repos || []
-  const content = tab === 'chat' ? h('div', { className: 'dsh-collaboration-panel-status' }, h('p', { className: 'dsh-collaboration-panel-status-title' }, 'Chat'), h('p', { className: 'dsh-collaboration-panel-status-desc' }, 'Use the conversation composer below to continue.'))
+  const toolbarRepos = items ? requireRepos(repos) : null
+  const content = tab === 'chat' ? h('div', { className: 'dsh-collaboration-panel-status' }, h('p', { className: 'dsh-collaboration-panel-status-title' }, 'Chat'), h('p', { className: 'dsh-collaboration-panel-status-desc' }, 'Chat integration is not available yet.'))
     : tab === 'activity' ? h(ActivityPane, { items: visibleItems, full: true, onOpen: openRow })
     : view === 'table'
       ? h(TableView, { items: visibleItems, selected, onOpen: openRow })
@@ -194,8 +200,7 @@ function Panel() {
       ),
       h('div', { className: 'dsh-collaboration-panel-filters' },
         h('button', { type: 'button', className: `dsh-collaboration-panel-filter${filterRepo === null ? ' on' : ''}`, onClick: () => setFilterRepo(null) }, 'all repos'),
-        toolbarRepos.map(repo => h('button', { key: repo, type: 'button', className: `dsh-collaboration-panel-filter${filterRepo === repo ? ' on' : ''}`, onClick: () => setFilterRepo(repo) }, `repo: ${repo}`)),
-        h('span', { className: 'dsh-collaboration-panel-filter static' }, 'assignee: me'),
+        items && toolbarRepos.map(repo => h('button', { key: repo, type: 'button', className: `dsh-collaboration-panel-filter${filterRepo === repo ? ' on' : ''}`, onClick: () => setFilterRepo(repo) }, `repo: ${repo}`)),
       ),
       h('button', { type: 'button', className: 'dsh-collaboration-panel-toolbar-action', title: 'Refresh', 'aria-label': 'Refresh', onClick: () => void refresh() }, h(IconRefresh)),
     ),
@@ -212,6 +217,5 @@ function Panel() {
     loggingIn && h('div', { className: 'dsh-collaboration-panel-login' }, h('p', { className: 'dsh-collaboration-panel-login-title' }, notice && notice.message ? notice.message : 'Starting GitHub login…'), notice && notice.code && h('div', { className: 'dsh-collaboration-panel-code' }, notice.code), notice && notice.url && h('a', { href: notice.url, target: '_blank', rel: 'noreferrer' }, notice.url)),
     !error && !loggingIn && !items && h('div', { className: 'dsh-collaboration-panel-body' }, h('div', { className: 'dsh-collaboration-panel-status' }, h('div', { className: 'dsh-collaboration-panel-spinner', 'aria-hidden': true }), h('p', { className: 'dsh-collaboration-panel-status-title' }, 'Loading collaboration'), h('p', { className: 'dsh-collaboration-panel-status-desc' }, 'Fetching open issues and review requests from the watchlist.'))),
     !error && !loggingIn && items && h('div', { className: 'dsh-collaboration-panel-body' }, h('div', { className: 'dsh-collaboration-panel-body-column' }, content, detail && h('div', { className: 'dsh-collaboration-panel-detail' }, h('div', { className: 'dsh-collaboration-panel-detail-head' }, h('h3', { className: 'dsh-collaboration-panel-detail-title' }, detail.title), h('span', { className: 'dsh-collaboration-panel-state' }, detail.state)), h('div', { className: 'dsh-collaboration-panel-fields' }, h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'red' }), `labels: ${detail.labels.join(', ') || '—'}`), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'yellow' }), `assignees: ${detail.assignees.join(', ') || '—'}`), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'green' }), `reviewers: ${detail.requestedReviewers.join(', ') || '—'}`)), h('pre', { className: 'dsh-collaboration-panel-detail-body' }, detail.body || '(no body)'), h('a', { href: detail.url, target: '_blank', rel: 'noreferrer' }, 'Open in GitHub')))),
-    h('form', { className: 'dsh-collaboration-panel-composer', onSubmit: event => event.preventDefault() }, h('input', { readOnly: true, placeholder: 'Message this project…', 'aria-label': 'Message this project' }), h('button', { type: 'submit', disabled: true }, 'Send')),
   )
 }
