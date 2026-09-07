@@ -6,7 +6,30 @@ import { createInstallationToken } from './token.ts'
 import type { OrgConfig } from './config.ts'
 
 export type { Config, OrgConfig } from './config.ts'
-export { createAppJwt, createInstallationToken, readPrivateKey } from './token.ts'
+
+export interface CommitChange {
+  path: string
+  content: string
+}
+
+export interface PullRequestResult {
+  number: number
+  url: string
+  commitSha: string
+  branch: string
+  base: string
+}
+
+interface CommitPullRequestInput {
+  org: string
+  repo: string
+  base: string
+  branch: string
+  message: string
+  title: string
+  body: string
+  changes: CommitChange[]
+}
 
 export default class GitHubBot extends Service {
   static inject = ['tools']
@@ -19,29 +42,44 @@ export default class GitHubBot extends Service {
     this.config = config
 
     ctx.tools.register(defineTool({
-      name: 'github_bot_installation_token',
-      description: 'Mint a GitHub App installation token for a configured organization.',
+      name: 'github_bot_commit_pull_request',
+      description: 'Commit files, push a branch, and open a pull request with the configured GitHub App.',
       parameters: {
         org: { type: 'string', required: true },
+        repo: { type: 'string', required: true, description: 'Repository in owner/name form.' },
+        base: { type: 'string', required: true },
+        branch: { type: 'string', required: true },
+        message: { type: 'string', required: true },
+        title: { type: 'string', required: true },
+        body: { type: 'string', required: true },
+        changes: {
+          type: 'array',
+          required: true,
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', required: true },
+              content: { type: 'string', required: true },
+            },
+            additionalProperties: false,
+          },
+        },
       },
       output: {
         schema: {
           type: 'object',
           properties: {
-            token: { type: 'string', required: true },
-            expiresAt: { type: 'string', required: true },
-            org: { type: 'string', required: true },
+            number: { type: 'number', required: true },
+            url: { type: 'string', required: true },
+            commitSha: { type: 'string', required: true },
+            branch: { type: 'string', required: true },
+            base: { type: 'string', required: true },
           },
           additionalProperties: false,
         },
         render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
       },
-      execute: async ({ org }) => {
-        const orgConfig: OrgConfig | undefined = this.config.orgs[org]
-        if (!orgConfig) throw new Error(`github-bot: unknown org ${org}`)
-        const token = await createInstallationToken(orgConfig)
-        return { ...token, org }
-      },
+      execute: async args => this.commitAndOpenPullRequest(args as CommitPullRequestInput),
     }))
 
     ctx.tools.register(defineTool({
@@ -54,6 +92,52 @@ export default class GitHubBot extends Service {
       },
       execute: async () => Object.keys(this.config.orgs),
     }))
+  }
+
+  async commitAndOpenPullRequest(input: CommitPullRequestInput): Promise<PullRequestResult> {
+    const [owner, repo] = input.repo.split('/')
+    const baseRef = await this.request(input.org, `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(input.base)}`) as { object: { sha: string } }
+    const parentSha = baseRef.object.sha
+    const parent = await this.request(input.org, `/repos/${owner}/${repo}/git/commits/${parentSha}`) as { tree: { sha: string } }
+    const blobs = await Promise.all(input.changes.map(async change => {
+      const blob = await this.request(input.org, `/repos/${owner}/${repo}/git/blobs`, {
+        method: 'POST',
+        body: JSON.stringify({ content: change.content, encoding: 'utf-8' }),
+      }) as { sha: string }
+      return { path: change.path, mode: '100644', type: 'blob', sha: blob.sha }
+    }))
+    const tree = await this.request(input.org, `/repos/${owner}/${repo}/git/trees`, {
+      method: 'POST',
+      body: JSON.stringify({ base_tree: parent.tree.sha, tree: blobs }),
+    }) as { sha: string }
+    const commit = await this.request(input.org, `/repos/${owner}/${repo}/git/commits`, {
+      method: 'POST',
+      body: JSON.stringify({ message: input.message, tree: tree.sha, parents: [parentSha] }),
+    }) as { sha: string }
+    await this.request(input.org, `/repos/${owner}/${repo}/git/refs`, {
+      method: 'POST',
+      body: JSON.stringify({ ref: `refs/heads/${input.branch}`, sha: commit.sha }),
+    })
+    const pull = await this.request(input.org, `/repos/${owner}/${repo}/pulls`, {
+      method: 'POST',
+      body: JSON.stringify({ title: input.title, body: input.body, head: input.branch, base: input.base }),
+    }) as { number: number; html_url: string }
+    return { number: pull.number, url: pull.html_url, commitSha: commit.sha, branch: input.branch, base: input.base }
+  }
+
+  private async request(org: string, path: string, init?: RequestInit): Promise<unknown> {
+    const orgConfig: OrgConfig | undefined = this.config.orgs[org]
+    if (!orgConfig) throw new Error(`github-bot: unknown org ${org}`)
+    const { token } = await createInstallationToken(orgConfig)
+    const headers = new Headers(init?.headers)
+    headers.set('accept', 'application/vnd.github+json')
+    headers.set('authorization', `Bearer ${token}`)
+    headers.set('content-type', 'application/json')
+    headers.set('x-github-api-version', '2022-11-28')
+    const response = await fetch(`${orgConfig.apiBaseUrl ?? 'https://api.github.com'}${path}`, { ...init, headers })
+    const text = await response.text()
+    if (!response.ok) throw new Error(`github-bot: GitHub API ${response.status}: ${text}`)
+    return text.length === 0 ? null : JSON.parse(text)
   }
 }
 
