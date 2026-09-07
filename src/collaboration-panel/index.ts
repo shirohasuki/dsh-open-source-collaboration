@@ -17,6 +17,14 @@ export interface BoardItem {
   url: string
 }
 
+export interface BoardError {
+  repo: string
+  kind: 'error'
+  message: string
+}
+
+export type BoardEntry = BoardItem | BoardError
+
 export interface BoardDetail extends BoardItem {
   state: string
   body: string
@@ -71,21 +79,36 @@ export function mapDetail(raw: any, repo: string, kind: Kind): BoardDetail {
   }
 }
 
-async function listItems(ctx: Context): Promise<BoardItem[]> {
-  const { login } = await ctx.role.whoami()
-  const items: BoardItem[] = []
+async function listItems(ctx: Context): Promise<BoardEntry[]> {
+  const identity = await ctx.role.whoami()
+  const permissionErrors = identity.errors ?? {}
+  const items: BoardEntry[] = []
   for (const repo of ctx.role.watchlist) {
-    for (const [kind, q] of [
-      ['issue', issueSearchQuery(repo, login)],
-      ['pr', prSearchQuery(repo, login)],
-    ] as const) {
-      const body: any = await ctx.role.githubJson(
-        `/search/issues?q=${encodeURIComponent(q)}&per_page=50`,
-      )
-      for (const raw of body.items) items.push(mapSearchItem(raw, kind))
+    const permissionError = permissionErrors[repo]
+    if (permissionError) {
+      items.push({ repo, kind: 'error', message: permissionError.message })
+      continue
+    }
+    try {
+      for (const [kind, q] of [
+        ['issue', issueSearchQuery(repo, identity.login)],
+        ['pr', prSearchQuery(repo, identity.login)],
+      ] as const) {
+        const body: any = await ctx.role.githubJson(
+          `/search/issues?q=${encodeURIComponent(q)}&per_page=50`,
+        )
+        for (const raw of body.items) items.push(mapSearchItem(raw, kind))
+      }
+    } catch (error) {
+      if (!(error instanceof Error) || !/^GitHub [0-9]\+:/.test(error.message)) throw error
+      items.push({ repo, kind: 'error', message: error.message })
     }
   }
-  items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  items.sort((a, b) => {
+    if (a.kind === 'error') return b.kind === 'error' ? a.repo.localeCompare(b.repo) : 1
+    if (b.kind === 'error') return -1
+    return b.updatedAt.localeCompare(a.updatedAt)
+  })
   return items
 }
 

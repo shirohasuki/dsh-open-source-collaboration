@@ -13,6 +13,12 @@ interface BoardItem {
   updatedAt: string;
   url: string;
 }
+interface BoardError {
+  repo: string;
+  kind: 'error';
+  message: string;
+}
+type BoardEntry = BoardItem | BoardError;
 interface BoardDetail extends BoardItem {
   state: string;
   body: string;
@@ -26,4 +32,4 @@ declare function mapSearchItem(raw: any, kind: Kind): BoardItem;
 declare function mapDetail(raw: any, repo: string, kind: Kind): BoardDetail;
 declare function apply(ctx: Context): void;
 //#endregion
-export { BoardDetail, BoardItem, Kind, apply, inject, issueSearchQuery, mapDetail, mapSearchItem, name, prSearchQuery };
+export { BoardDetail, BoardEntry, BoardError, BoardItem, Kind, apply, inject, issueSearchQuery, mapDetail, mapSearchItem, name, prSearchQuery };

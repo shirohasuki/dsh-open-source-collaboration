@@ -7,7 +7,7 @@ import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { AuthorizationInteraction } from '@deepseek-ai/dsh-authorization'
 import { KEY } from './constants.ts'
-import { githubJson, login, runDeviceFlow, whoami } from './github.ts'
+import { githubJson, login, runDeviceFlow, whoami, type WhoamiResult } from './github.ts'
 import type { Config } from './config.ts'
 import { isRepoRef } from '../repo-ref.ts'
 export { KEY } from './constants.ts'
@@ -64,6 +64,7 @@ export default class Role extends Service {
           properties: {
             login: { type: 'string', required: true },
             maintainers: { type: 'json', required: true },
+            errors: { type: 'json', required: true },
           },
           additionalProperties: false,
         },
@@ -159,7 +160,7 @@ export default class Role extends Service {
     return login({ ctx: this.ctx, config: this.config, watchlist: this.watchlist }, interaction, signal)
   }
 
-  async whoami(): Promise<{ login: string; maintainers: Record<string, boolean> }> {
+  async whoami(): Promise<WhoamiResult> {
     return whoami({ ctx: this.ctx, config: this.config, watchlist: this.watchlist })
   }
 
