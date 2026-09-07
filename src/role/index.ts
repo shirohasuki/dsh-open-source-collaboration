@@ -9,6 +9,7 @@ import type { AuthorizationInteraction } from '@deepseek-ai/dsh-authorization'
 import { KEY } from './constants.ts'
 import { githubJson, login, runDeviceFlow, whoami } from './github.ts'
 import type { Config } from './config.ts'
+import { isRepoRef } from '../repo-ref.ts'
 export { KEY } from './constants.ts'
 export type { Config } from './config.ts'
 
@@ -88,7 +89,7 @@ export default class Role extends Service {
     const value: unknown = JSON.parse(readFileSync(this.reposPath, 'utf8'))
     if (!Array.isArray(value)) throw new Error('role: repos file must contain an array: ' + this.reposPath)
     for (const repo of value) {
-      if (typeof repo !== 'string' || !/^[^/]+\/[^/]+$/.test(repo)) throw new Error('role: bad repo ' + String(repo))
+      if (!isRepoRef(repo)) throw new Error('role: bad repo ' + String(repo) + '; expected owner/name with safe path segments')
     }
     return value
   }
@@ -112,7 +113,7 @@ export default class Role extends Service {
       const chunks: Buffer[] = []
       for await (const chunk of req) chunks.push(Buffer.from(chunk))
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { repo?: unknown }
-      if (typeof body.repo !== 'string' || !/^[^/]+\/[^/]+$/.test(body.repo)) throw new Error('role: bad repo ' + String(body.repo))
+      if (!isRepoRef(body.repo)) throw new Error('role: bad repo ' + String(body.repo) + '; expected owner/name with safe path segments')
       const repos = this.watchlist
       if (req.method === 'DELETE') this.saveRepos(repos.filter(repo => repo !== body.repo))
       else if (!repos.includes(body.repo)) this.saveRepos([...repos, body.repo])
