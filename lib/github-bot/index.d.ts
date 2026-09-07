@@ -41,6 +41,7 @@ declare class GitHubBot extends Service {
   readonly config: Config;
   constructor(ctx: Context, config: Config);
   commitAndOpenPullRequest(input: CommitPullRequestInput): Promise<PullRequestResult>;
+  private request;
 }
 declare module '@deepseek-ai/cordis' {
   interface Context {
