@@ -19,11 +19,11 @@ declare class Repos extends Service {
   select(repo: string): string;
   constructor(ctx: Context, config: Config);
   private repoRef;
-  /** Expected path for a configured repo name. */
+  /** Expected path for a configured repository reference. */
   path(name: string): string;
   /** Absolute path of an ensured repo; throws if not cloned yet. */
   get(name: string): string;
-  /** Clone into workspace/<name> when absent; reuse existing git checkout. */
+  /** Clone into workspace/<owner>/<repo> when absent; reuse existing git checkout. */
   ensure(name: string): string;
 }
 //#endregion
