@@ -9,6 +9,22 @@ export interface RoleHost {
   readonly config: Config
   readonly watchlist: readonly string[]
 }
+export class GitHubHttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, body: string) {
+    super(`GitHub ${status}: ${body}`)
+    this.name = 'GitHubHttpError'
+    this.status = status
+  }
+}
+
+export interface WhoamiResult {
+  login: string
+  maintainers: Record<string, boolean>
+  errors: Record<string, { status: number; message: string }>
+}
+
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -32,16 +48,22 @@ export async function login(role: RoleHost, interaction: AuthorizationInteractio
   return { login: user.login }
 }
 
-export async function whoami(role: RoleHost): Promise<{ login: string; maintainers: Record<string, boolean> }> {
+export async function whoami(role: RoleHost): Promise<WhoamiResult> {
   const user = await githubJson(role, '/user') as { login?: unknown }
   if (typeof user.login !== 'string' || user.login.length === 0) throw new Error('role: /user missing login')
   const maintainers: Record<string, boolean> = {}
+  const errors: WhoamiResult['errors'] = {}
   for (const repo of role.watchlist) {
     const [owner, name] = repo.split('/')
-    const body = await githubJson(role, `/repos/${owner}/${name}/collaborators/${user.login}/permission`)
-    maintainers[repo] = isMaintainer(parsePermission(body))
+    try {
+      const body = await githubJson(role, `/repos/${owner}/${name}/collaborators/${user.login}/permission`)
+      maintainers[repo] = isMaintainer(parsePermission(body))
+    } catch (error) {
+      if (!(error instanceof GitHubHttpError) || (error.status !== 403 && error.status !== 404)) throw error
+      errors[repo] = { status: error.status, message: error.message }
+    }
   }
-  return { login: user.login, maintainers }
+  return { login: user.login, maintainers, errors }
 }
 
 export async function githubJson(role: RoleHost, path: string, init?: RequestInit): Promise<unknown> {
@@ -60,7 +82,7 @@ export async function githubJson(role: RoleHost, path: string, init?: RequestIni
   headers.set('User-Agent', 'dsh-role')
   const response = await fetch(url, { ...init, headers })
   const text = await response.text()
-  if (!response.ok) throw new Error(`GitHub ${response.status}: ${text}`)
+  if (!response.ok) throw new GitHubHttpError(response.status, text)
   return text.length === 0 ? null : JSON.parse(text)
 }
 

@@ -41,6 +41,7 @@ declare class Role extends Service {
   whoami(): Promise<{
     login: string;
     maintainers: Record<string, boolean>;
+    errors: Record<string, { status: number; message: string }>;
   }>;
   githubJson(path: string, init?: RequestInit): Promise<unknown>;
 }
