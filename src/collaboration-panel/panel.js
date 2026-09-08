@@ -4,35 +4,6 @@ function fmtTime(iso) {
   return date.toLocaleString()
 }
 
-function itemLabel(item) {
-  return item.kind === 'pr' ? 'Review request' : 'Assigned issue'
-}
-
-function ActivityPane({ items, full, onOpen }) {
-  const errors = items ? items.filter(item => item.kind === 'error') : []
-  const activity = items ? items.filter(item => item.kind !== 'error').slice(0, 6) : []
-  const visible = errors.concat(activity)
-  return h('aside', { className: `dsh-collaboration-panel-activity${full ? ' dsh-collaboration-panel-activity-only' : ''}` },
-    h('div', { className: 'dsh-collaboration-panel-activity-head' }, 'ACTIVITY'),
-    h('div', { className: 'dsh-collaboration-panel-activity-list' },
-      visible.length > 0
-        ? visible.map((item) => item.kind === 'error'
-          ? h('div', { key: item.repo, className: 'dsh-collaboration-panel-activity-row' },
-              h('span', { className: 'dsh-collaboration-panel-activity-dot warning', 'aria-hidden': true }),
-              h('span', { className: 'dsh-collaboration-panel-activity-copy' }, 'Repository unavailable', h('em', null, item.repo + ': ' + item.message)),
-            )
-          : h('button', { key: item.repo + '#' + item.number, type: 'button', className: 'dsh-collaboration-panel-activity-row', onClick: () => onOpen(item) },
-              h('span', { className: 'dsh-collaboration-panel-activity-dot ' + (item.kind === 'pr' ? 'success' : 'warning'), 'aria-hidden': true }),
-              h('span', { className: 'dsh-collaboration-panel-activity-copy' }, itemLabel(item), h('em', null, item.repo + '#' + item.number + ' · ' + fmtTime(item.updatedAt))),
-            ))
-        : h('div', { className: 'dsh-collaboration-panel-activity-row' },
-            h('span', { className: 'dsh-collaboration-panel-activity-dot ghost', 'aria-hidden': true }),
-            h('span', { className: 'dsh-collaboration-panel-activity-empty' }, items ? 'No live activity yet.' : 'Waiting for live activity…'),
-          ),
-    ),
-  )
-}
-
 function BoardCard({ item, selected, onOpen }) {
   return h('button', { type: 'button', className: `dsh-collaboration-panel-card${selected ? ' on' : ''}`, onClick: () => onOpen(item) },
     h('span', { className: 'dsh-collaboration-panel-card-title' }, item.title),
@@ -53,19 +24,19 @@ function BoardView({ items, selected, onOpen }) {
     h('div', { className: 'dsh-collaboration-panel-column-head' }, h('span', null, column.label), h('span', null, String(column.items.length))),
     h('div', { className: 'dsh-collaboration-panel-column-items' }, column.items.length > 0
       ? column.items.map(item => h(BoardCard, { key: `${item.repo}#${item.number}`, item, selected: selected === `${item.repo}#${item.number}`, onOpen }))
-      : h('div', { className: 'dsh-collaboration-panel-activity-empty' }, 'No open items.'),
+      : h('div', { className: 'dsh-collaboration-panel-empty-note' }, 'No open items.'),
     ),
   )))
 }
 
-function TableView({ items, selected, onOpen }) {
-  return h('table', { className: 'dsh-collaboration-panel-table' },
-    h('thead', null, h('tr', null, h('th', null, 'TYPE'), h('th', null, 'ITEM'), h('th', null, 'UPDATED'))),
-    h('tbody', null, items.map(item => h('tr', { key: `${item.repo}#${item.number}`, className: selected === `${item.repo}#${item.number}` ? 'on' : '', onClick: item.kind === 'error' ? undefined : () => onOpen(item) },
-      h('td', null, h('span', { className: 'dsh-collaboration-panel-table-kind' }, item.kind)),
-      h('td', null, h('div', { className: 'dsh-collaboration-panel-table-title' }, item.kind === 'error' ? 'Repository unavailable' : item.title), h('div', null, item.kind === 'error' ? `${item.repo}: ${item.message}` : `${item.repo}#${item.number} · ${item.author}`)),
-      h('td', null, item.kind === 'error' ? '—' : fmtTime(item.updatedAt)),
-    ))),
+function RepoErrors({ items }) {
+  const errors = items.filter(item => item.kind === 'error')
+  if (errors.length === 0) return null
+  return h('div', { className: 'dsh-collaboration-panel-repo-errors' },
+    errors.map(item => h('div', { key: item.repo, className: 'dsh-collaboration-panel-repo-error' },
+      h('strong', null, item.repo),
+      `: ${item.message}`,
+    )),
   )
 }
 
@@ -113,9 +84,6 @@ function Panel() {
   const [loggingIn, setLoggingIn] = useState(false)
   const [detail, setDetail] = useState(null)
   const [selected, setSelected] = useState(null)
-  const [tab, setTab] = useState('board')
-  const [view, setView] = useState('board')
-  const [filterRepo, setFilterRepo] = useState(null)
   const [manageWatchlist, setManageWatchlist] = useState(false)
   const openRowRequest = React.useRef(0)
 
@@ -192,47 +160,27 @@ function Panel() {
       const response = await fetch(REPOS, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo }) })
       const text = await response.text()
       if (!response.ok) throw new Error(text)
-      const nextRepos = requireRepos(JSON.parse(text))
-      setRepos(nextRepos)
-      if (filterRepo === repo) setFilterRepo(null)
+      setRepos(requireRepos(JSON.parse(text)))
       void refresh()
     } catch (err) { setError(err instanceof Error ? err.message : String(err)) }
     finally { setRepoBusy(false) }
   }
 
-  const visibleItems = items ? items.filter(item => !filterRepo || item.repo === filterRepo) : []
-  const toolbarRepos = items ? requireRepos(repos) : null
-  const content = tab === 'activity' ? h(ActivityPane, { items: visibleItems, full: true, onOpen: openRow })
-    : view === 'table'
-      ? h(TableView, { items: visibleItems, selected, onOpen: openRow })
-      : h('div', { className: 'dsh-collaboration-panel-workspace' }, h(BoardView, { items: visibleItems, selected, onOpen: openRow }), h(ActivityPane, { items: visibleItems, onOpen: openRow }))
+  const boardItems = items ? items.filter(item => item.kind !== 'error') : []
 
   return h('div', { className: 'dsh-collaboration-panel' },
-    h('nav', { className: 'dsh-collaboration-panel-tabs', 'aria-label': 'Collaboration views' },
-      ['board', 'activity'].map(name => h('button', { key: name, type: 'button', className: `dsh-collaboration-panel-tab${tab === name ? ' on' : ''}`, onClick: () => setTab(name) }, name[0].toUpperCase() + name.slice(1))),
-    ),
-    h('div', { className: 'dsh-collaboration-panel-toolbar' },
-      tab === 'board' && h('div', { className: 'dsh-collaboration-panel-views', 'aria-label': 'Saved view' },
-        ['board', 'table'].map(name => h('button', { key: name, type: 'button', className: `dsh-collaboration-panel-view${view === name ? ' on' : ''}`, onClick: () => setView(name) }, name[0].toUpperCase() + name.slice(1))),
-      ),
-      h('div', { className: 'dsh-collaboration-panel-filters' },
-        h('button', { type: 'button', className: `dsh-collaboration-panel-filter${filterRepo === null ? ' on' : ''}`, onClick: () => setFilterRepo(null) }, 'all repos'),
-        items && toolbarRepos.map(repo => h('button', { key: repo, type: 'button', className: `dsh-collaboration-panel-filter${filterRepo === repo ? ' on' : ''}`, onClick: () => setFilterRepo(repo) }, `repo: ${repo}`)),
-      ),
-      h('button', { type: 'button', className: 'dsh-collaboration-panel-toolbar-action', title: 'Refresh', 'aria-label': 'Refresh', onClick: () => void refresh() }, h(IconRefresh)),
-    ),
     h('div', { className: 'dsh-collaboration-panel-watchlist' },
       h('span', { className: 'dsh-collaboration-panel-watchlist-label' }, 'WATCHLIST'),
       h('div', { className: 'dsh-collaboration-panel-repos' }, repos && repos.length > 0
         ? repos.map(repo => h('span', { className: 'dsh-collaboration-panel-repo-chip', key: repo }, repo, manageWatchlist && h('button', { type: 'button', disabled: repoBusy, onClick: () => void removeRepo(repo), 'aria-label': `Remove ${repo}` }, '×')))
-        : h('span', { className: 'dsh-collaboration-panel-activity-empty' }, 'Add a repository to start.'),
+        : h('span', { className: 'dsh-collaboration-panel-empty-note' }, 'Add a repository to start.'),
       ),
       (manageWatchlist || !repos || repos.length === 0) && h('form', { className: 'dsh-collaboration-panel-repo-form', onSubmit: addRepo }, h('input', { value: repoInput, onInput: event => setRepoInput(event.currentTarget.value), placeholder: 'owner/name', 'aria-label': 'Repository owner/name', spellCheck: false }), h('button', { type: 'submit', disabled: repoBusy, className: 'dsh-collaboration-panel-add' }, repoBusy ? 'Saving…' : 'Add')),
-      repos && repos.length > 0 && h('button', { type: 'button', className: 'dsh-collaboration-panel-toolbar-action', title: manageWatchlist ? 'Close watchlist' : 'Manage watchlist', 'aria-label': manageWatchlist ? 'Close watchlist' : 'Manage watchlist', onClick: () => setManageWatchlist(!manageWatchlist) }, manageWatchlist ? '×' : '+'),
+      repos && repos.length > 0 && h('button', { type: 'button', className: 'dsh-collaboration-panel-watchlist-action', title: manageWatchlist ? 'Close watchlist' : 'Manage watchlist', 'aria-label': manageWatchlist ? 'Close watchlist' : 'Manage watchlist', onClick: () => setManageWatchlist(!manageWatchlist) }, manageWatchlist ? '×' : '+'),
     ),
     error && h('div', { className: 'dsh-collaboration-panel-error' }, error),
     loggingIn && h('div', { className: 'dsh-collaboration-panel-login' }, h('p', { className: 'dsh-collaboration-panel-login-title' }, notice && notice.message ? notice.message : 'Starting GitHub login…'), notice && notice.code && h('div', { className: 'dsh-collaboration-panel-code' }, notice.code), notice && notice.url && h('a', { href: notice.url, target: '_blank', rel: 'noreferrer' }, notice.url)),
     !error && !loggingIn && !items && h('div', { className: 'dsh-collaboration-panel-body' }, h('div', { className: 'dsh-collaboration-panel-status' }, h('div', { className: 'dsh-collaboration-panel-spinner', 'aria-hidden': true }), h('p', { className: 'dsh-collaboration-panel-status-title' }, 'Loading collaboration'), h('p', { className: 'dsh-collaboration-panel-status-desc' }, 'Fetching open issues and review requests from the watchlist.'))),
-    !error && !loggingIn && items && h('div', { className: 'dsh-collaboration-panel-body' }, h('div', { className: 'dsh-collaboration-panel-body-column' }, content, detail && h('div', { className: 'dsh-collaboration-panel-detail' }, h('div', { className: 'dsh-collaboration-panel-detail-head' }, h('h3', { className: 'dsh-collaboration-panel-detail-title' }, detail.title), h('span', { className: 'dsh-collaboration-panel-state' }, detail.state)), h('div', { className: 'dsh-collaboration-panel-fields' }, h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'red' }), `labels: ${detail.labels.join(', ') || '—'}`), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'yellow' }), `assignees: ${detail.assignees.join(', ') || '—'}`), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'green' }), `reviewers: ${detail.requestedReviewers.join(', ') || '—'}`)), h('pre', { className: 'dsh-collaboration-panel-detail-body' }, detail.body || '(no body)'), h('a', { href: detail.url, target: '_blank', rel: 'noreferrer' }, 'Open in GitHub')))),
+    !error && !loggingIn && items && h('div', { className: 'dsh-collaboration-panel-body' }, h('div', { className: 'dsh-collaboration-panel-body-column' }, h(RepoErrors, { items }), h(BoardView, { items: boardItems, selected, onOpen: openRow }), detail && h('div', { className: 'dsh-collaboration-panel-detail' }, h('div', { className: 'dsh-collaboration-panel-detail-head' }, h('h3', { className: 'dsh-collaboration-panel-detail-title' }, detail.title), h('span', { className: 'dsh-collaboration-panel-state' }, detail.state)), h('div', { className: 'dsh-collaboration-panel-fields' }, h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'red' }), `labels: ${detail.labels.join(', ') || '—'}`), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'yellow' }), `assignees: ${detail.assignees.join(', ') || '—'}`), h('span', { className: 'dsh-collaboration-panel-field' }, h('span', { className: 'dsh-collaboration-panel-dot', 'data-tone': 'green' }), `reviewers: ${detail.requestedReviewers.join(', ') || '—'}`)), h('pre', { className: 'dsh-collaboration-panel-detail-body' }, detail.body || '(no body)'), h('a', { href: detail.url, target: '_blank', rel: 'noreferrer' }, 'Open in GitHub')))),
   )
 }
