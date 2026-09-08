@@ -49,4 +49,4 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 //#endregion
-export { type CommitChange, type Config, GitHubBot as default, type OrgConfig, type PullRequestResult };
+export { CommitChange, type Config, type OrgConfig, PullRequestResult, GitHubBot as default };

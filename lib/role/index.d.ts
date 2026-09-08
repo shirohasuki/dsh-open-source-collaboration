@@ -11,6 +11,17 @@ interface Config {
   oauthBaseUrl: string;
 }
 //#endregion
+//#region src/role/github.d.ts
+
+interface WhoamiResult {
+  login: string;
+  maintainers: Record<string, boolean>;
+  errors: Record<string, {
+    status: number;
+    message: string;
+  }>;
+}
+//#endregion
 //#region src/role/constants.d.ts
 declare const KEY: _deepseek_ai_dsh_credentials0.CredentialKey;
 //#endregion
@@ -38,11 +49,7 @@ declare class Role extends Service {
   login(interaction: AuthorizationInteraction, signal?: AbortSignal): Promise<{
     login: string;
   }>;
-  whoami(): Promise<{
-    login: string;
-    maintainers: Record<string, boolean>;
-    errors: Record<string, { status: number; message: string }>;
-  }>;
+  whoami(): Promise<WhoamiResult>;
   githubJson(path: string, init?: RequestInit): Promise<unknown>;
 }
 //#endregion
