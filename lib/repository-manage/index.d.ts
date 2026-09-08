@@ -24,7 +24,7 @@ declare class Repos extends Service {
   /** Absolute path of an ensured repo; throws if not cloned yet. */
   get(name: string): string;
   /** Clone into workspace/<owner>/<repo> when absent; reuse existing git checkout. */
-  ensure(name: string): string;
+  ensure(name: string): Promise<string>;
 }
 //#endregion
 export { Config, Repos as default };

@@ -51,6 +51,7 @@ declare class Role extends Service {
   }>;
   whoami(): Promise<WhoamiResult>;
   githubJson(path: string, init?: RequestInit): Promise<unknown>;
+  githubCloneUrl(repo: string): Promise<string>;
 }
 //#endregion
 export { type Config, KEY, Role as default, isMaintainer, parsePermission };
