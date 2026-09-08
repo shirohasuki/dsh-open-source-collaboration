@@ -119,6 +119,13 @@ export default class Repos extends Service {
       stdio: 'inherit',
     })
     if (result.status !== 0) throw new Error(`git clone failed for ${name}`)
+    const publicUrl = new URL(cloneUrl)
+    publicUrl.username = ''
+    publicUrl.password = ''
+    const remoteResult = spawnSync('git', ['-C', dir, 'remote', 'set-url', 'origin', publicUrl.toString()], {
+      stdio: 'inherit',
+    })
+    if (remoteResult.status !== 0) throw new Error(`git remote cleanup failed for ${name}`)
     return dir
   }
 }
